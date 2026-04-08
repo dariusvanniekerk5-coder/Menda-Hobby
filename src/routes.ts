@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
-import { storage } from "./storage";
+import { storage, type Job } from "./storage";
 import { insertUserSchema, insertJobSchema, insertProviderSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ export function registerRoutes(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy(async (username: string, password: string, done: (error: any, user?: any, options?: any) => void) => {
       try {
         const user = await storage.getUserByUsername(username);
         // NOTE: For a quick launch this is plain text, but you should add bcrypt hashing soon!
@@ -86,7 +86,7 @@ export function registerRoutes(app: Express) {
   // --- JOB ROUTES ---
   app.get("/api/jobs", requireAuth, async (req, res) => {
     const user = req.user as any;
-    let jobs = [];
+    let jobs: Job[] = [];
     if (user.role === "customer" || user.role === "property_manager") {
       jobs = await storage.getJobsByCustomerId(user.id);
     } else if (user.role === "provider") {
@@ -112,7 +112,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/jobs/:id/status", requireAuth, async (req, res) => {
     try {
       const { status } = z.object({ status: z.string() }).parse(req.body);
-      const job = await storage.updateJobStatus(req.params.id, status);
+      const job = await storage.updateJobStatus(req.params.id as string, status);
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to update status" });
@@ -121,8 +121,8 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/jobs/:id/assign", requireAuth, async (req, res) => {
     try {
-      const { providerId } = z.object({ providerId: z.string() }).parse(req.body);
-      const job = await storage.assignProvider(req.params.id, providerId);
+      const { providerId } = z.object({ providerId: z.number() }).parse(req.body);
+      const job = await storage.assignProvider(req.params.id as string, providerId);
       res.json(job);
     } catch (error) {
       res.status(500).json({ error: "Failed to assign provider" });
@@ -149,7 +149,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/providers/:id/vet", requireAuth, async (req, res) => {
     try {
       const { status } = z.object({ status: z.union([z.literal("verified"), z.literal("rejected")]) }).parse(req.body);
-      const provider = await storage.updateProviderStatus(req.params.id, status);
+      const provider = await storage.updateProviderStatus(req.params.id as string, status);
       res.json(provider);
     } catch (error) {
       res.status(500).json({ error: "Failed to update vetting status" });
