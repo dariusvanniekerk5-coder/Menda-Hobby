@@ -1,2 +1,11 @@
-[start]
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.build]
+cmds = [
+  "npm ci --include=dev",
+  "npm run build"
+]
+
+[phases.start]
 cmd = "node dist/index.js"
