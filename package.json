@@ -1,8 +1,9 @@
 {
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node index.js",
-    "build": "ls -R",
-    "db:push": "drizzle-kit push"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
   },
   "dependencies": {
     "@types/express-session": "^1.18.2",

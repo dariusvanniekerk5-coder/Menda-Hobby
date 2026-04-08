@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { users, jobs, providers } from "./schema";
 import { eq, or } from "drizzle-orm";
-import type { InsertUser, InsertJob, InsertProvider } from "../shared/schema";
+import type { InsertUser, InsertJob, InsertProvider } from "./schema";
 
 export interface User {
   id: number;
