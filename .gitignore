@@ -1,3 +1,16 @@
 node_modules
 dist
 .env
+# Environment
+.env
+
+# Session store
+.loki-sessions
+
+# Drizzle
+drizzle/
+drizzle.config.js
+
+# Logs and temp
+*.log
+npm-debug.log*
