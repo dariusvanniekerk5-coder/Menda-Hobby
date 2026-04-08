@@ -6,14 +6,30 @@ import { storage, type Job } from "./storage";
 import { insertUserSchema, insertJobSchema, insertProviderSchema } from "./schema";
 import { z } from "zod";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const connectLoki = require("connect-loki");
+const LokiStore = connectLoki(session) as {
+  new (options?: Record<string, unknown>): session.Store;
+};
+
 export function registerRoutes(app: Express) {
+  // Fail fast if SESSION_SECRET is not set in production
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET environment variable must be set in production");
+  }
+
   // --- PASSPORT & SESSION SETUP ---
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "menda_super_secret_key",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: process.env.NODE_ENV === "production" },
+      store: new LokiStore({ path: "./.loki-sessions" }),
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        httpOnly: true,
+      },
     })
   );
 
