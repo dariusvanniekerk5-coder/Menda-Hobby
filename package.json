@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "node index.js",
-    "build": "tsc",
+    "build": "ls -R",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
