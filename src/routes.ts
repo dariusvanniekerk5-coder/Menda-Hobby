@@ -3,7 +3,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import { storage, type Job } from "./storage";
-import { insertUserSchema, insertJobSchema, insertProviderSchema } from "@shared/schema";
+import { insertUserSchema, insertJobSchema, insertProviderSchema } from "./schema";
 import { z } from "zod";
 
 export function registerRoutes(app: Express) {
