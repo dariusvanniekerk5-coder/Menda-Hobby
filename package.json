@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node index.js",
     "build": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -26,7 +26,7 @@
     "@types/passport": "^1.0.17",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.18.1",
     "typescript": "^6.0.2"
   }
 }
