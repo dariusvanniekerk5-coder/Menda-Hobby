@@ -2,9 +2,13 @@ import type { Express, Request, Response, NextFunction } from "express";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
+import bcrypt from "bcryptjs";
 import { storage, type Job } from "./storage";
 import { insertUserSchema, insertJobSchema, insertProviderSchema } from "./schema";
 import { z } from "zod";
+
+const LokiStoreFactory = require("connect-loki");
+const LokiStore = LokiStoreFactory(session);
 
 export function registerRoutes(app: Express) {
   // --- PASSPORT & SESSION SETUP ---
@@ -13,21 +17,32 @@ export function registerRoutes(app: Express) {
       secret: process.env.SESSION_SECRET || "menda_super_secret_key",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: process.env.NODE_ENV === "production" },
+      store: new LokiStore({ path: "./.loki-sessions" }),
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        httpOnly: true,
+      },
     })
   );
 
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // LocalStrategy with proper password comparison
   passport.use(
     new LocalStrategy(async (username: string, password: string, done: (error: any, user?: any, options?: any) => void) => {
       try {
         const user = await storage.getUserByUsername(username);
-        // NOTE: For a quick launch this is plain text, but you should add bcrypt hashing soon!
-        if (!user || user.password !== password) {
+        if (!user) {
           return done(null, false, { message: "Invalid username or password" });
         }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+          return done(null, false, { message: "Invalid username or password" });
+        }
+
         return done(null, user);
       } catch (err) {
         return done(err as Error);
@@ -51,26 +66,30 @@ export function registerRoutes(app: Express) {
   };
 
   // --- AUTH ROUTES ---
-  app.post("/api/auth/register", async (req, res) => {
+  // --- REGISTER ROUTE (now with hashing) ---
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      console.log("Received register body:", req.body);
-      const userData = insertUserSchema.parse(req.body);
-      const existingUser = await storage.getUserByUsername(userData.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-      const user = await storage.insertUser(userData);
-      req.login(user, (err) => {
-        if (err) throw err;
-        res.status(201).json(user);
+      const { username, email, password, role } = req.body;
+
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const newUser = await storage.insertUser({
+        username,
+        email,
+        password: hashedPassword,
+        role: role || "customer",
       });
+
+      console.log("User registered with hashed password:", newUser.username);
+      res.status(201).json(newUser);
     } catch (error: any) {
       console.error("Register error:", error);
-      res.status(400).json({
-        error: "Invalid data",
-        details: error.message,
-        issues: error.issues || error,
-      });
+      if (error.message?.includes("unique")) {
+        res.status(400).json({ message: "Username already exists" });
+      } else {
+        res.status(400).json({ message: "Invalid data" });
+      }
     }
   });
 
