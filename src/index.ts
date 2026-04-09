@@ -5,13 +5,13 @@ import { registerRoutes } from './routes';
 
 const app = express();
 
-// CORS setup - allows frontend to connect
+// ✅ CORS setup - allows your React frontend to connect
 app.use(cors({
   origin: [
-    "http://localhost:5173",
+    "http://localhost:5173",      // Vite (React) dev server
     "http://localhost:3000",
     "https://menda-production-bc57.up.railway.app",
-    "https://menda.co.za",
+    "https://menda.co.za",        // ← we'll update this when you buy the domain
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
