@@ -53,6 +53,7 @@ export function registerRoutes(app: Express) {
   // --- AUTH ROUTES ---
   app.post("/api/auth/register", async (req, res) => {
     try {
+      console.log("Received register body:", req.body);
       const userData = insertUserSchema.parse(req.body);
       const existingUser = await storage.getUserByUsername(userData.username);
       if (existingUser) {
@@ -63,8 +64,13 @@ export function registerRoutes(app: Express) {
         if (err) throw err;
         res.status(201).json(user);
       });
-    } catch (error) {
-      res.status(400).json({ error: "Invalid data" });
+    } catch (error: any) {
+      console.error("Register error:", error);
+      res.status(400).json({
+        error: "Invalid data",
+        details: error.message,
+        issues: error.issues || error,
+      });
     }
   });
 
