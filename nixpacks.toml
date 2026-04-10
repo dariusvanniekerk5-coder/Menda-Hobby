@@ -5,4 +5,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node dist/index.js"
+cmd = "node dist/index.cjs"
