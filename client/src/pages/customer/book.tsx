@@ -54,18 +54,37 @@ export default function CustomerBook() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await addJob({
-        serviceId: service.id,
-        title: service.name + " — " + description.slice(0, 60),
-        description: description,
-        address: address,
-        price: total,
-        scheduledAt: date ? date.toISOString() : undefined,
+      const res = await fetch("/api/payfast/initiate", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceId: service.id,
+          title: service.name + " — " + description.slice(0, 60),
+          description,
+          address,
+          price: total,
+          scheduledAt: date ? date.toISOString() : undefined,
+        }),
       });
-      setLocation("/customer/jobs");
+      if (!res.ok) throw new Error("Payment initiation failed");
+      const { paymentUrl, paymentData } = await res.json();
+
+      // Build and auto-submit a hidden PayFast form
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = paymentUrl;
+      Object.entries(paymentData).forEach(([k, v]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = k;
+        input.value = String(v);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
     } catch (err) {
-      console.error("Failed to create job:", err);
-    } finally {
+      console.error("Payment failed:", err);
       setIsSubmitting(false);
     }
   };

@@ -5,6 +5,24 @@ import { hash, compare } from "bcrypt";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import crypto from "crypto";
+
+// ─── PayFast Config ────────────────────────────────────────────────────────
+const PF_MERCHANT_ID  = process.env.PAYFAST_MERCHANT_ID  || "10000100";
+const PF_MERCHANT_KEY = process.env.PAYFAST_MERCHANT_KEY || "46f0cd694581a";
+const PF_PASSPHRASE   = process.env.PAYFAST_PASSPHRASE   || "jt7NOE43FZPn";
+const PF_URL = process.env.NODE_ENV === "production"
+  ? "https://www.payfast.co.za/eng/process"
+  : "https://sandbox.payfast.co.za/eng/process";
+
+function pfSignature(data: Record<string, string>): string {
+  let str = Object.entries(data)
+    .filter(([k, v]) => k !== "signature" && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v).trim()).replace(/%20/g, "+")}`)
+    .join("&");
+  if (PF_PASSPHRASE) str += `&passphrase=${encodeURIComponent(PF_PASSPHRASE.trim()).replace(/%20/g, "+")}`;
+  return crypto.createHash("md5").update(str).digest("hex");
+}
 
 declare module "express-session" {
   interface SessionData { userId: string; }
@@ -337,6 +355,80 @@ Your role: Give helpful rough cost estimates, explain the platform, answer home 
     } catch (e: any) {
       res.status(500).json({ reply: "I'm having trouble right now. Please email support@menda.co.za." });
     }
+  });
+
+  // ─── ADMIN SEED ─────────────────────────────────────────────────────────
+  // Hit once to create the first admin account. Protected by a secret.
+  app.post("/api/admin/seed", async (req, res) => {
+    try {
+      const { secret } = req.body;
+      const expected = process.env.ADMIN_SEED_SECRET || "menda-admin-2026";
+      if (secret !== expected) return res.status(403).json({ error: "Invalid secret" });
+      const existing = await storage.getUserByEmail("admin@menda.co.za");
+      if (existing) return res.json({ exists: true, email: "admin@menda.co.za", note: "Admin already exists — just log in." });
+      const hashed = await hash("Menda@Admin2026!", 10);
+      await storage.insertUser({
+        username: "menda_admin_" + Date.now(),
+        password: hashed,
+        email: "admin@menda.co.za",
+        fullName: "Menda Admin",
+        phone: null,
+        role: "admin",
+      });
+      res.json({ success: true, email: "admin@menda.co.za", password: "Menda@Admin2026!" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ─── PAYFAST PAYMENTS ────────────────────────────────────────────────────
+  // Creates the job, generates PayFast payload — frontend submits the form
+  app.post("/api/payfast/initiate", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { serviceId, title, description, address, price, scheduledAt } = req.body;
+      const job = await storage.insertJob({
+        customerId: user.id,
+        serviceId, title, description: description || "",
+        address, price: String(Number(price || 0).toFixed(2)),
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        status: "pending",
+      });
+
+      const baseUrl = process.env.BASE_URL || "https://menda-production-bc57.up.railway.app";
+      const amount  = Number(price || 0).toFixed(2);
+      const pfData: Record<string, string> = {
+        merchant_id:   PF_MERCHANT_ID,
+        merchant_key:  PF_MERCHANT_KEY,
+        return_url:    `${baseUrl}/payment/success?jobId=${job.id}`,
+        cancel_url:    `${baseUrl}/payment/cancelled?jobId=${job.id}`,
+        notify_url:    `${baseUrl}/api/payfast/notify`,
+        name_first:    user.fullName.split(" ")[0] || user.fullName,
+        name_last:     user.fullName.split(" ").slice(1).join(" ") || "",
+        email_address: user.email,
+        m_payment_id:  job.id,
+        amount,
+        item_name:     title.slice(0, 100),
+        item_description: (description || "").slice(0, 255),
+      };
+      pfData.signature = pfSignature(pfData);
+
+      res.json({ jobId: job.id, paymentUrl: PF_URL, paymentData: pfData });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // PayFast ITN (webhook) — verifies signature, updates job status
+  app.post("/api/payfast/notify", async (req, res) => {
+    try {
+      const pfData = req.body as Record<string, string>;
+      const expected = pfSignature(pfData);
+      if (pfData.signature !== expected) return res.status(400).send("Bad signature");
+      const jobId = pfData.m_payment_id;
+      if (pfData.payment_status === "COMPLETE") {
+        await storage.updateJobStatus(jobId, "accepted");
+        const job = await storage.getJobById(jobId);
+        if (job) notify(job.customerId, "Payment Confirmed!", `R${pfData.amount_gross} is held in escrow for your job. A provider will be assigned shortly.`, "payment", jobId);
+      }
+      res.status(200).send("OK");
+    } catch (e: any) { res.status(500).send("Error: " + e.message); }
   });
 
   // NOTIFICATIONS

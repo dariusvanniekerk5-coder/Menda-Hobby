@@ -14,6 +14,8 @@ import ProviderJobDetails from "@/pages/provider/job-details";
 import ProviderEarnings from "@/pages/provider/earnings";
 import ProviderSignup from "@/pages/provider/signup";
 import NotFound from "@/pages/not-found";
+import PaymentSuccess from "@/pages/payment-success";
+import PaymentCancelled from "@/pages/payment-cancelled";
 import {
   CustomerProfile,
   ProviderProfile,
@@ -41,6 +43,8 @@ const Router = () => (
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/providers" component={AdminProviders} />
       <Route path="/admin/jobs" component={AdminJobs} />
+      <Route path="/payment/success" component={PaymentSuccess} />
+      <Route path="/payment/cancelled" component={PaymentCancelled} />
       <Route component={NotFound} />
     </Switch>
   </Layout>
