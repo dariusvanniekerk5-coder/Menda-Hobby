@@ -1,16 +1,6 @@
 node_modules
 dist
-.env
-# Environment
-.env
-
-# Session store
-.loki-sessions
-
-# Drizzle
-drizzle/
-drizzle.config.js
-
-# Logs and temp
-*.log
-npm-debug.log*
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz

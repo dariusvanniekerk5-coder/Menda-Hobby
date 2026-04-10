@@ -1,0 +1,114 @@
+import { db } from "./db";
+import { users, jobs, providers, reviews } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
+import type { InsertUser, User, Job, Provider } from "@shared/schema";
+
+export interface IStorage {
+  // Users
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  insertUser(user: InsertUser): Promise<User>;
+
+  // Jobs
+  getAllJobs(): Promise<Job[]>;
+  getJobById(id: string): Promise<Job | undefined>;
+  getJobsByCustomerId(customerId: string): Promise<Job[]>;
+  getJobsByProviderId(providerId: string): Promise<Job[]>;
+  insertJob(job: any): Promise<Job>;
+  updateJobStatus(jobId: string, status: string): Promise<Job>;
+  assignProvider(jobId: string, providerId: string): Promise<Job>;
+
+  // Providers
+  getAllProviders(): Promise<Provider[]>;
+  getProviderByUserId(userId: string): Promise<Provider | undefined>;
+  insertProvider(provider: any): Promise<Provider>;
+  updateProviderStatus(providerId: string, status: string): Promise<Provider>;
+}
+
+export class DatabaseStorage implements IStorage {
+
+  // --- USERS ---
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async insertUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  // --- JOBS ---
+  async getAllJobs(): Promise<Job[]> {
+    return db.select().from(jobs).orderBy(desc(jobs.createdAt));
+  }
+
+  async getJobById(id: string): Promise<Job | undefined> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    return job;
+  }
+
+  async getJobsByCustomerId(customerId: string): Promise<Job[]> {
+    return db.select().from(jobs)
+      .where(eq(jobs.customerId, customerId))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  async getJobsByProviderId(providerId: string): Promise<Job[]> {
+    return db.select().from(jobs)
+      .where(eq(jobs.providerId, providerId))
+      .orderBy(desc(jobs.createdAt));
+  }
+
+  async insertJob(jobData: any): Promise<Job> {
+    const [job] = await db.insert(jobs).values(jobData).returning();
+    return job;
+  }
+
+  async updateJobStatus(jobId: string, status: string): Promise<Job> {
+    const [job] = await db.update(jobs)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(jobs.id, jobId))
+      .returning();
+    return job;
+  }
+
+  async assignProvider(jobId: string, providerId: string): Promise<Job> {
+    const [job] = await db.update(jobs)
+      .set({ providerId, status: "accepted", updatedAt: new Date() })
+      .where(eq(jobs.id, jobId))
+      .returning();
+    return job;
+  }
+
+  // --- PROVIDERS ---
+  async getAllProviders(): Promise<Provider[]> {
+    return db.select().from(providers);
+  }
+
+  async getProviderByUserId(userId: string): Promise<Provider | undefined> {
+    const [provider] = await db.select().from(providers)
+      .where(eq(providers.userId, userId));
+    return provider;
+  }
+
+  async insertProvider(providerData: any): Promise<Provider> {
+    const [provider] = await db.insert(providers).values(providerData).returning();
+    return provider;
+  }
+
+  async updateProviderStatus(providerId: string, status: string): Promise<Provider> {
+    const [provider] = await db.update(providers)
+      .set({ status: status as any })
+      .where(eq(providers.id, providerId))
+      .returning();
+    return provider;
+  }
+}
+
+export const storage = new DatabaseStorage();
